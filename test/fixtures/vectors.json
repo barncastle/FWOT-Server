@@ -1,0 +1,83 @@
+{
+  "_note": "reference vectors for test/codec.test.ts",
+  "prefixKey": "k7rcnwefaaavs3pavqkzmfikn7yibwgfghsbsch2i",
+  "suffixKey": "rw6r2n9czldfajoy8tu13l1xerqgwuc7mr2lqtr5x",
+  "checksum": [
+    {
+      "input": "",
+      "md5": "9dca48507eb501a0ae726124062334d5"
+    },
+    {
+      "input": "a b&c=d%e/f?g#h~i-j_k.l\"m\n\u00e9\u4e2d",
+      "md5": "ef1519fbfc2ab947d88fcf446769f2d5"
+    },
+    {
+      "input": "{\"player_id\":\"abc123\",\"human_id\":null,\"appid\":\"com.tinycorp.futurama.android\",\"install_id\":\"00000000000000000000000000000000\",\"run_number\":3,\"run_number_this_version\":1,\"client_timestamp\":1757635200,\"session\":\"ffffffffffffffffffffffffffffffff\",\"num_attempts\":1,\"data\":[[\"login\",{\"id\":\"abc123\"}],[\"getSalt\",{}]]}",
+      "md5": "698036b7f898fc11a05d99030cde21fa"
+    }
+  ],
+  "percentEncode": [
+    {
+      "input": "a b&c=d%e/f?g#h~i-j_k.l\"m\n\u00e9\u4e2d",
+      "encoded": "a%20b%26c%3dd%25e%2ff%3fg%23h~i-j_k.l%22m%0a%c3%a9%e4%b8%ad"
+    },
+    {
+      "input": "plain",
+      "encoded": "plain"
+    }
+  ],
+  "encodeRequest": {
+    "envelope": {
+      "player_id": "abc123",
+      "human_id": null,
+      "appid": "com.tinycorp.futurama.android",
+      "install_id": "00000000000000000000000000000000",
+      "run_number": 3,
+      "run_number_this_version": 1,
+      "client_timestamp": 1757635200,
+      "session": "ffffffffffffffffffffffffffffffff",
+      "num_attempts": 1,
+      "data": [
+        [
+          "login",
+          {
+            "id": "abc123"
+          }
+        ],
+        [
+          "getSalt",
+          {}
+        ]
+      ]
+    },
+    "body": "request=%7b%22player_id%22%3a%22abc123%22%2c%22human_id%22%3anull%2c%22appid%22%3a%22com.tinycorp.futurama.android%22%2c%22install_id%22%3a%2200000000000000000000000000000000%22%2c%22run_number%22%3a3%2c%22run_number_this_version%22%3a1%2c%22client_timestamp%22%3a1757635200%2c%22session%22%3a%22ffffffffffffffffffffffffffffffff%22%2c%22num_attempts%22%3a1%2c%22data%22%3a%5b%5b%22login%22%2c%7b%22id%22%3a%22abc123%22%7d%5d%2c%5b%22getSalt%22%2c%7b%7d%5d%5d%7d&chksum=698036b7f898fc11a05d99030cde21fa"
+  },
+  "pbuf": {
+    "rawHex": "0801120474657374080112047465737408011204746573740801120474657374080112047465737408011204746573740801120474657374",
+    "wire": "eJzjYBRiKUktLuEgkQYAXn8NGg==",
+    "cks": "0430b63ccc8be87d7ace751098f50cc9",
+    "tagged": "p:eJzjYBRiKUktLuEgkQYAXn8NGg=="
+  },
+  "etag": [
+    {
+      "size": 0,
+      "fillHex": "00",
+      "etag": "\"d41d8cd98f00b204e9800998ecf8427e\""
+    },
+    {
+      "size": 11,
+      "fillHex": "68656c6c6f20776f726c64",
+      "etag": "\"5eb63bbbe01eeed093cb22bb8f5acdc3\""
+    },
+    {
+      "size": 8388608,
+      "fillHex": "a5",
+      "etag": "\"3c4a9bac2197facb4d1719a8c610253e\""
+    },
+    {
+      "size": 9437184,
+      "fillHex": "a5",
+      "etag": "\"3b96422fa526f8cd6883811b73da799c-2\""
+    }
+  ]
+}
