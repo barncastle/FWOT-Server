@@ -1,0 +1,9 @@
+{
+  "host": "0.0.0.0",
+  "port": 8090,
+  "publicUrl": "http://localhost:8090",
+  "tls": null,
+  "cdn": { "servers": ["https://static-fut-tc.akamaized.net/"], "cache": true },
+  "logging": { "verbose": false },
+  "scaling": { "buildTime": 1.0, "reward": 1.0, "cost": 1.0 }
+}

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+config.json
+BRIEF.md
+MILESTONE*.md
+data/
+patches/*.json
+!patches/example.json
