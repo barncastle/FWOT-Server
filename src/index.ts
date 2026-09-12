@@ -132,7 +132,11 @@ function main(): void {
     process.on(signal, () => {
       console.log(`\n${signal}: flushing store`);
       store.flush();
+      // The client keeps connections alive, and close() waits on them, so drop
+      // the idle ones and cap the wait on any that are mid-request.
+      if ("closeIdleConnections" in server) server.closeIdleConnections();
       server.close(() => process.exit(0));
+      setTimeout(() => process.exit(0), 2000).unref();
     });
   }
 }
