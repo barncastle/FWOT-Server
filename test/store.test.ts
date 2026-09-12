@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
-  existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync,
+  existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, utimesSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -93,4 +94,84 @@ test("the new-player template is re-read when the file changes", () => {
   assert.deepEqual(store.newPlayerTemplate(), Buffer.from("first"));
   writeFileSync(path, Buffer.from("second!"));
   assert.deepEqual(store.newPlayerTemplate(), Buffer.from("second!"));
+});
+
+test("a traversing player_id cannot escape the save tree", () => {
+  const dir = root();
+  const store = new Store(dir);
+  for (const id of ["..", ".", "../..", "a/b", "..\..", "\u0000x"]) {
+    assert.equal(store.storeSave(id, blob("escape")), true, id);
+  }
+  // Everything landed under data/saves, and nothing leaked into data/.
+  assert.deepEqual(readdirSync(join(dir, "data")).sort(), ["saves"]);
+  for (const name of readdirSync(join(dir, "data", "saves"))) {
+    assert.match(name, /^[A-Za-z0-9_-]{1,64}$/);
+  }
+  assert.deepEqual(store.loadSave(".."), Buffer.from("escape"));
+});
+
+test("ids differing only in unsafe characters get separate directories", () => {
+  const dir = root();
+  const store = new Store(dir);
+  store.storeSave("a b", blob("first"));
+  store.storeSave("a_b", blob("second"));
+  assert.equal(readdirSync(join(dir, "data", "saves")).length, 2);
+  assert.deepEqual(store.loadSave("a b"), Buffer.from("first"));
+  assert.deepEqual(store.loadSave("a_b"), Buffer.from("second"));
+});
+
+test("a hex player id stays readable on disk", () => {
+  const dir = root();
+  const store = new Store(dir);
+  store.storeSave("0123456789abcdef", blob("x"));
+  assert.deepEqual(readdirSync(join(dir, "data", "saves")), ["0123456789abcdef"]);
+});
+
+test("an over-long id is stored, not thrown", () => {
+  const store = new Store(root());
+  assert.equal(store.storeSave("A".repeat(4096), blob("long")), true);
+  assert.deepEqual(store.loadSave("A".repeat(4096)), Buffer.from("long"));
+});
+
+test("a zlib bomb is refused during inflation, not after", () => {
+  const store = new Store(root());
+  const bomb = deflateSync(Buffer.alloc(64 * 1024 * 1024)).toString("base64");
+  assert.ok(bomb.length < 200 * 1024, "the bomb is small on the wire");
+  assert.equal(store.storeSave("p1", bomb), false);
+  assert.equal(store.loadSave("p1"), null);
+});
+
+test("a save of exactly the cap is still accepted", () => {
+  const store = new Store(root());
+  const atCap = deflateSync(Buffer.alloc(1024 * 1024, 7)).toString("base64");
+  assert.equal(store.storeSave("p1", atCap), true);
+  assert.equal(store.loadSave("p1")!.length, 1024 * 1024);
+});
+
+test("an unreadable users.json starts empty instead of throwing", () => {
+  const dir = root();
+  mkdirSync(join(dir, "data"), { recursive: true });
+  for (const bad of ['{"users": {"p1":', "null", "[]", ""]) {
+    writeFileSync(join(dir, "data", "users.json"), bad);
+    const store = new Store(dir);
+    assert.equal(store.users.size, 0, bad);
+  }
+});
+
+test("prune never deletes the save the user record points at", () => {
+  const dir = root();
+  const store = new Store(dir);
+  for (let i = 0; i < 10; i++) store.storeSave("p1", blob(`save ${i}`));
+
+  // Step the clock back: every existing save is dated an hour ahead, so the
+  // save written next sorts OLDEST by mtime and heads the delete list while
+  // the user record still points at it.
+  const saveDir = join(dir, "data", "saves", "p1");
+  const ahead = new Date(Date.now() + 3600_000);
+  for (const name of readdirSync(saveDir)) utimesSync(join(saveDir, name), ahead, ahead);
+
+  store.storeSave("p1", blob("live"));
+  const saveId = store.users.get("p1")!.saveId!;
+  assert.ok(existsSync(join(saveDir, `${saveId}.pb`)), "the live save survived");
+  assert.deepEqual(store.loadSave("p1"), Buffer.from("live"));
 });

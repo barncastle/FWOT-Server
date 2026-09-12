@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { inflateSync } from "node:zlib";
+import { md5 } from "./codec.js";
 
 const USERS_FILE = "data/users.json";
 const SAVES_DIR = "data/saves";
@@ -31,9 +32,19 @@ function saveStamp(counter: number): string {
   return `${iso}-${String(counter % 1000).padStart(3, "0")}`;
 }
 
-/** Anything outside [A-Za-z0-9_.-] is folded. */
+/**
+ * Directory name for one user. player_id is client-controlled, so a plain
+ * fold-to-underscore is not enough here: it preserves `.`, which leaves `..`
+ * intact and walks the save out of the tree, and it maps distinct ids onto one
+ * directory, where a prune can delete another player's current save.
+ *
+ * Real ids are hex -- playerFor returns md5[:16] and getOrCreatePlayerId a
+ * full md5 -- so they pass through readable. Anything else is replaced by its
+ * md5, which cannot traverse, cannot exceed the name length limit, and cannot
+ * collide with a plain id without an md5 preimage.
+ */
 function safeId(userId: string): string {
-  return (userId || "anonymous").replace(/[^A-Za-z0-9_.-]/g, "_");
+  return /^[A-Za-z0-9_-]{1,64}$/.test(userId) ? userId : md5(userId || "anonymous");
 }
 
 function writeAtomic(path: string, data: Buffer | string): void {
@@ -53,9 +64,18 @@ export class Store {
   constructor(private readonly root: string) {
     const path = join(root, USERS_FILE);
     if (!existsSync(path)) return;
-    const blob: unknown = JSON.parse(readFileSync(path, "utf8"));
-    const table = (blob as { users?: Record<string, UserRecord> }).users ?? {};
-    for (const [id, rec] of Object.entries(table)) this.users.set(id, rec);
+    // A truncated or hand-edited table must not take the server down with a
+    // raw stack: warn, start empty, and leave the file for the operator. The
+    // save files themselves are untouched.
+    try {
+      const blob: unknown = JSON.parse(readFileSync(path, "utf8"));
+      const table = (blob as { users?: Record<string, UserRecord> } | null)?.users;
+      if (table === undefined) throw new Error("no users object");
+      for (const [id, rec] of Object.entries(table)) this.users.set(id, rec);
+    } catch (err) {
+      console.warn(`  ! ${USERS_FILE} is unreadable, starting empty: ${err}`);
+      this.users.clear();
+    }
   }
 
   /** Record the request against its user, creating the row on first sight. */
@@ -103,24 +123,39 @@ export class Store {
   storeSave(userId: string, body: string): boolean {
     let raw: Buffer;
     try {
-      raw = inflateSync(Buffer.from(body, "base64"));
+      // maxOutputLength makes zlib abort DURING inflation. Checking the size
+      // afterwards is too late: a few tens of KB of base64 expands to hundreds
+      // of megabytes first, well under any request body cap on the way in.
+      raw = inflateSync(Buffer.from(body, "base64"), { maxOutputLength: SAVE_CAP });
     } catch (err) {
       console.warn(`    ! could not decode saveV3 blob for ${userId}: ${err}`);
       return false;
     }
-    if (raw.length === 0 || raw.length > SAVE_CAP) {
-      console.warn(`    ! rejected saveV3 blob for ${userId}: ${raw.length} bytes`);
+    if (raw.length === 0) {
+      console.warn(`    ! rejected empty saveV3 blob for ${userId}`);
       return false;
     }
+    // The write and the prune are inside the guard too: anything thrown here
+    // would escape handleAction and fail the whole batch, costing the client
+    // the replies to every other action in the same POST.
     const saveId = saveStamp(this.counter++);
-    writeAtomic(this.savePath(userId, saveId), raw);
+    try {
+      writeAtomic(this.savePath(userId, saveId), raw);
+    } catch (err) {
+      console.warn(`    ! could not write save for ${userId}: ${err}`);
+      return false;
+    }
     const rec = this.users.get(userId) ?? {
       banned: false, saveId: null, lastSeen: new Date().toISOString(), lastIp: "",
     };
     rec.saveId = saveId;
     this.users.set(userId, rec);
     this.markDirty();
-    this.prune(userId);
+    try {
+      this.prune(userId);
+    } catch (err) {
+      console.warn(`    ! could not prune history for ${userId}: ${err}`);
+    }
     console.log(`    saved ${raw.length} bytes for player ${userId} (${saveId})`);
     return true;
   }
@@ -141,11 +176,17 @@ export class Store {
 
   private prune(userId: string): void {
     const dir = join(this.root, SAVES_DIR, safeId(userId));
-    // Names sort chronologically: the stamp leads and the counter only
-    // disambiguates saves landing inside one second.
-    const files = readdirSync(dir).filter((f) => f.endsWith(".pb")).sort();
-    for (const name of files.slice(0, Math.max(0, files.length - SAVE_HISTORY))) {
-      rmSync(join(dir, name), { force: true });
+    // Order by mtime, not by name: the name's counter wraps at 1000 and a
+    // clock stepped backwards makes an older save sort newest, either of which
+    // would put the live save at the head of the delete list.
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith(".pb"))
+      .map((name) => ({ name, mtime: statSync(join(dir, name)).mtimeMs }))
+      .sort((a, b) => a.mtime - b.mtime || a.name.localeCompare(b.name));
+    const current = this.users.get(userId)?.saveId;
+    for (const f of files.slice(0, Math.max(0, files.length - SAVE_HISTORY))) {
+      if (current && f.name === `${current}.pb`) continue;   // never the live save
+      rmSync(join(dir, f.name), { force: true });
     }
   }
 
