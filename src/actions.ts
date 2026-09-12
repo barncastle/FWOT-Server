@@ -116,7 +116,10 @@ export function handleAction(
       : (typeof p["p"] === "string" ? p["p"] as string
         : envelope["saved_game_pbuf"]);
     if (typeof blob === "string") {
-      const tag = blob.slice(0, 4).indexOf(":");
+      // base64 never contains a colon, so the first one anywhere ends the tag.
+      // Looking only at the first four characters would let a longer tag
+      // through into the decoder and lose the save without saying so.
+      const tag = blob.indexOf(":");
       ctx.store.storeSave(playerId, tag >= 0 ? blob.slice(tag + 1) : blob);
     }
     // The reply is {"success": true} -- not save_ok. A rejected

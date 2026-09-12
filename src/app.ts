@@ -28,9 +28,12 @@ function callsFrom(envelope: Record<string, unknown> | null, rpc: string): Call[
   const data = envelope?.["data"];
   if (Array.isArray(data)) {
     for (const item of data) {
-      if (Array.isArray(item) && item.length > 0) {
-        calls.push([String(item[0]), item.length > 1 ? item[1] : {}]);
-      }
+      // A malformed element still takes a slot. Dropping it would silently
+      // shift every later reply one place and pair each action with the wrong
+      // answer; an unnamed call falls through to {} + success.
+      calls.push(Array.isArray(item) && item.length > 0
+        ? [String(item[0]), item.length > 1 ? item[1] : {}]
+        : ["", {}]);
     }
   }
   if (calls.length > 0) return calls;

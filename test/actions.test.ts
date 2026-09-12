@@ -129,3 +129,18 @@ test("playerFor falls back through id, device_id, install_id, anonymous", () => 
   assert.equal(playerFor({ install_id: "i" }, {}), md5("i").slice(0, 16));
   assert.equal(playerFor({}, {}), md5("anonymous").slice(0, 16));
 });
+
+test("saveV3 strips a tag longer than four characters", () => {
+  const c = ctx();
+  const raw = Buffer.from("tagged town");
+  const body = deflateSync(raw).toString("base64");
+  assert.deepEqual(handleAction("saveV3", ENV, "save:" + body, c), { success: true });
+  assert.deepEqual(c.store.loadSave("abc123"), raw);
+});
+
+test("saveV3 accepts an untagged blob unchanged", () => {
+  const c = ctx();
+  const raw = Buffer.from("untagged");
+  handleAction("saveV3", ENV, deflateSync(raw).toString("base64"), c);
+  assert.deepEqual(c.store.loadSave("abc123"), raw);
+});

@@ -142,3 +142,34 @@ async function rawPost(body: string, encoding: string): Promise<{
     });
   });
 }
+
+test("a malformed data element keeps response[i] aligned with data[i]", async () => {
+  const { json } = await post({
+    player_id: "p1",
+    data: [["login", {}], [], ["logout", {}], "junk", ["getClientMessageQueue", {}]],
+  });
+  assert.equal(json.response.length, 5);
+  assert.deepEqual(json.response[0], { device_flags: [], success: true });
+  assert.deepEqual(json.response[1], { success: true });   // placeholder
+  assert.equal(json.response[2], null);                    // logout, not shifted
+  assert.deepEqual(json.response[3], { success: true });
+  assert.deepEqual(json.response[4], []);
+});
+
+test("a save that cannot be stored does not cost the batch its other replies", async () => {
+  const { res, json } = await post({
+    player_id: "p1",
+    data: [["saveV3", "p:not a real blob"], ["logout", {}], ["getPushPreferences", {}]],
+  });
+  assert.equal(res.status, 200);
+  assert.equal(json.response.length, 3);
+  assert.deepEqual(json.response[0], { success: true });
+  assert.equal(json.response[1], null);
+  assert.ok("push_preferences" in (json.response[2] as object));
+});
+
+test("a traversing player_id is answered normally and stores nothing outside", async () => {
+  const { res, json } = await post({ player_id: "..", data: [["login", {}]] });
+  assert.equal(res.status, 200);
+  assert.deepEqual(json.response[0], { device_flags: [], success: true });
+});
