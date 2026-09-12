@@ -121,12 +121,28 @@ function main(): void {
   // No config set yet: the config actions answer with a bare success.
   const app = createApp({ store, gameConfig: null, verbose: config.logging.verbose });
 
-  const server = serve({ fetch: app.fetch, hostname: config.host, port: config.port });
-  console.log(`tapservice listening on http://${config.host}:${config.port}`);
-  console.log(`  publicUrl ${config.publicUrl}`);
-  console.log(`  users     ${store.users.size} known`);
-  console.log(`  scaling   buildTime=${config.scaling.buildTime} ` +
-    `reward=${config.scaling.reward} cost=${config.scaling.cost}`);
+  // The startup lines belong in the listening callback: printed before it,
+  // they announce a server that a failed bind is about to take down.
+  const server = serve(
+    { fetch: app.fetch, hostname: config.host, port: config.port },
+    (info) => {
+      console.log(`tapservice listening on http://${config.host}:${info.port}`);
+      console.log(`  publicUrl ${config.publicUrl}`);
+      console.log(`  users     ${store.users.size} known`);
+      console.log(`  scaling   buildTime=${config.scaling.buildTime} ` +
+        `reward=${config.scaling.reward} cost=${config.scaling.cost}`);
+    },
+  );
+
+  // Without this, a port already in use is an unhandled 'error' event: the
+  // operator gets a Node stack trace instead of the one line that says what
+  // to do. Node would exit on it anyway, so exiting 1 changes only the wording.
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    console.error(err.code === "EADDRINUSE"
+      ? `${config.host}:${config.port} is already in use`
+      : `server error: ${err.message}`);
+    process.exit(1);
+  });
 
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, () => {
