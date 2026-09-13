@@ -11,8 +11,19 @@ import type { Store } from "./store.js";
  * manifest: the config actions fall through to a bare success.
  */
 export interface GameConfig {
-  reply(now: number): Record<string, unknown>;
+  replyJson(now: number): string;
   contentPackNames(): string[];
+  /** The bytes behind a manifest name, for GET /config/. */
+  servedBytes(name: string): Buffer | undefined;
+}
+
+/**
+ * A reply already serialized. The config body is 20 MB with only the clock
+ * varying, so it is built as text once per state and spliced into the response
+ * rather than being stringified per request.
+ */
+export class RawJson {
+  constructor(readonly json: string) {}
 }
 
 export interface ActionContext {
@@ -81,7 +92,9 @@ export function handleAction(
     // The config reply, field for field. ConfigURL is NOT a
     // top-level key -- it sits at adHocConfigs.adhocs.ConfigURL, which is why
     // every ConfigURL published before this was ignored.
-    if (ctx.gameConfig) return ctx.gameConfig.reply(Math.floor(Date.now() / 1000));
+    if (ctx.gameConfig) {
+      return new RawJson(ctx.gameConfig.replyJson(Math.floor(Date.now() / 1000)));
+    }
   }
 
   if (name === "getGameStatePB") {

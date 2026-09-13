@@ -5,8 +5,8 @@ import { getConnInfo } from "@hono/node-server/conninfo";
 import { Hono, type Context } from "hono";
 import { promisify } from "node:util";
 import { gzip as gzipCb } from "node:zlib";
-import { handleAction, type ActionContext, type GameConfig } from "./actions.js";
-import { checksum, decodeRequest } from "./codec.js";
+import { handleAction, RawJson, type ActionContext, type GameConfig } from "./actions.js";
+import { checksum, decodeRequest, etagFor } from "./codec.js";
 import type { Store } from "./store.js";
 
 const gzip = promisify(gzipCb);
@@ -41,6 +41,7 @@ function callsFrom(envelope: Record<string, unknown> | null, rpc: string): Call[
 }
 
 function shape(entry: unknown): string {
+  if (entry instanceof RawJson) return "raw";
   if (entry === null) return "null";
   if (Array.isArray(entry)) return "[]";
   if (typeof entry === "object") return `[${Object.keys(entry).sort().join(",")}]`;
@@ -67,7 +68,8 @@ export function createApp(deps: AppDeps): Hono {
     // default `success`.
     const entries = calls.map(([name, params]) => {
       const payload = handleAction(name, envelope ?? {}, params, ctx);
-      if (payload !== null && typeof payload === "object" && !Array.isArray(payload)) {
+      if (payload !== null && typeof payload === "object" && !Array.isArray(payload)
+        && !(payload instanceof RawJson)) {
         const obj = payload as Record<string, unknown>;
         if (!("success" in obj)) obj["success"] = true;
       }
@@ -87,11 +89,23 @@ export function createApp(deps: AppDeps): Hono {
       );
     }
 
-    return respond(c, { response: entries });
+    return respond(c, entries);
   });
 
-  // Not served yet; the routes exist so they are reserved.
-  app.get("/config/*", (c) => c.text("not found", 404));
+  // The client validates the ETag against the bytes it receives, so these are
+  // never gzipped.
+  app.get("/config/*", (c) => {
+    const name = decodeURIComponent(c.req.path.slice("/config/".length));
+    const data = deps.gameConfig?.servedBytes(name);
+    if (!data) return c.text("not found", 404);
+    // Node types Buffer over ArrayBufferLike; Hono's body wants ArrayBuffer.
+    return c.body(data as Uint8Array<ArrayBuffer>, 200, {
+      "Content-Type": "application/json",
+      "ETag": etagFor(data),
+    });
+  });
+
+  // Not served yet; the route exists so it is reserved.
   app.get("/static/*", (c) => c.text("not found", 404));
 
   return app;
@@ -104,8 +118,9 @@ export function createApp(deps: AppDeps): Hono {
  * client asked for it -- its HTTP stack adds Accept-Encoding itself and
  * inflates transparently. The GET routes are never gzipped.
  */
-async function respond(c: Context, obj: unknown): Promise<Response> {
-  const body = JSON.stringify(obj);
+async function respond(c: Context, entries: unknown[]): Promise<Response> {
+  const body = `{"response":[${entries
+    .map((e) => (e instanceof RawJson ? e.json : JSON.stringify(e))).join(",")}]}`;
   const plain = Buffer.from(body, "utf8");
   const headers: Record<string, string> = {
     "Content-Type": "application/json; charset=utf-8",

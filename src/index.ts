@@ -6,6 +6,7 @@ import { serve } from "@hono/node-server";
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createApp } from "./app.js";
+import { loadGameConfig, type GameConfigSet } from "./gameconfig.js";
 import { Store } from "./store.js";
 
 export interface ServerConfig {
@@ -118,8 +119,17 @@ function main(): void {
   }
 
   const store = new Store(".");
-  // No config set yet: the config actions answer with a bare success.
-  const app = createApp({ store, gameConfig: null, verbose: config.logging.verbose });
+  let gameConfig: GameConfigSet | null;
+  try {
+    gameConfig = loadGameConfig(".", {
+      publicUrl: config.publicUrl,
+      scaling: config.scaling,
+    });
+  } catch (err) {
+    console.error(`config set: ${(err as Error).message}`);
+    process.exit(1);
+  }
+  const app = createApp({ store, gameConfig, verbose: config.logging.verbose });
 
   // The startup lines belong in the listening callback: printed before it,
   // they announce a server that a failed bind is about to take down.
@@ -129,6 +139,7 @@ function main(): void {
       console.log(`tapservice listening on http://${config.host}:${info.port}`);
       console.log(`  publicUrl ${config.publicUrl}`);
       console.log(`  users     ${store.users.size} known`);
+      console.log(`  configs   ${gameConfig?.manifest().length ?? 0} served`);
       console.log(`  scaling   buildTime=${config.scaling.buildTime} ` +
         `reward=${config.scaling.reward} cost=${config.scaling.cost}`);
     },
