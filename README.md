@@ -58,7 +58,22 @@ ignores user-installed CAs, so a self-signed or private-CA cert fails the
 handshake. On the internet, either give the server a real certificate or put a
 TLS-terminating reverse proxy in front of it.
 
+## Config set
+
+`data/configs` is served as the `config` reply: the files on disk plus the
+season-align promo shift, the event states in `data/events.json`, the patches in
+`patches/` and the scaling factors. A file nothing rewrites goes out as its
+bytes on disk.
+
+Edit a patch and the next `config` request rebuilds, but the client fetches
+`config` only at a cold launch, so a change lands when the game is next started
+from scratch -- as does a new scaling factor, including for a timer already
+running on the device.
+
+The reply is about 21 MB, gzipped to about 2.3 MB per request. That is ~0.4 s of
+CPU on each cold boot, which only matters if many clients boot at once.
+
 ## Status
 
-Done: transport, actions and storage. The config pipeline, the CDN routes,
+Done: transport, actions, storage and the config pipeline. The CDN routes,
 rate limiting and TLS are not built yet.

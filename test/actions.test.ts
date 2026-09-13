@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { deflateSync } from "node:zlib";
-import { handleAction, playerFor, type ActionContext, type GameConfig } from "../src/actions.js";
+import { handleAction, playerFor, RawJson, type ActionContext, type GameConfig } from "../src/actions.js";
 import { decodePbuf, md5 } from "../src/codec.js";
 import { Store } from "../src/store.js";
 
@@ -110,12 +110,14 @@ test("a rejected saveV3 still answers success and keeps the good save", () => {
 
 test("the config actions use the injected set when there is one", () => {
   const fake: GameConfig = {
-    reply: (now) => ({ cks: [], configTree: [], now }),
+    replyJson: (now) => `{"cks":[],"configTree":[],"now":${now}}`,
     contentPackNames: () => ["ContentPack-" + "0".repeat(32)],
+    servedBytes: () => undefined,
   };
   for (const name of ["config", "getConfigPatch", "sendInitRequest"]) {
-    const out = handleAction(name, ENV, {}, ctx(fake)) as Record<string, unknown>;
-    assert.deepEqual(Object.keys(out).sort(), ["cks", "configTree", "now"]);
+    const out = handleAction(name, ENV, {}, ctx(fake));
+    assert.ok(out instanceof RawJson);
+    assert.deepEqual(Object.keys(JSON.parse(out.json)).sort(), ["cks", "configTree", "now"]);
   }
   assert.deepEqual(handleAction("getContentPackRevisions", ENV, {}, ctx(fake)), {
     success: true,

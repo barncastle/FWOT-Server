@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { gunzipSync } from "node:zlib";
 import { createApp } from "../src/app.js";
-import { checksum, encodeRequest, percentEncode } from "../src/codec.js";
+import { checksum, encodeRequest, etagFor, percentEncode } from "../src/codec.js";
 import { Store } from "../src/store.js";
 
 let server: ServerType;
@@ -102,11 +102,40 @@ test("Accept-Encoding gzip returns one gzip member that inflates identically", a
   assert.equal(packed.headers["x-tc-digest"], checksum(plain.text));
 });
 
-test("the GET routes are reserved and never gzipped", async () => {
+test("the GET routes 404 with no config set, and are never gzipped", async () => {
   for (const path of ["/config/Characters", "/static/a/b.png"]) {
     const res = await fetch(base + path, { headers: { "Accept-Encoding": "gzip" } });
     assert.equal(res.status, 404);
     assert.equal(res.headers.get("content-encoding"), null);
+  }
+});
+
+test("GET /config serves the manifest's bytes with their etag", async () => {
+  const body = Buffer.from('{"Character":{}}', "utf8");
+  const app = createApp({
+    store: new Store(mkdtempSync(join(tmpdir(), "fwot-cfg-"))),
+    gameConfig: {
+      replyJson: () => "{}",
+      contentPackNames: () => [],
+      servedBytes: (name) => (name === "Characters" ? body : undefined),
+    },
+    verbose: false,
+  });
+  const one = serve({ fetch: app.fetch, port: 0 });
+  await new Promise((r) => one.once("listening", r));
+  const at = `http://127.0.0.1:${(one.address() as AddressInfo).port}`;
+  try {
+    const res = await fetch(`${at}/config/Characters`, {
+      headers: { "Accept-Encoding": "gzip" },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "application/json");
+    assert.equal(res.headers.get("etag"), etagFor(body));
+    assert.equal(res.headers.get("content-encoding"), null);
+    assert.deepEqual(Buffer.from(await res.arrayBuffer()), body);
+    assert.equal((await fetch(`${at}/config/Nothing`)).status, 404);
+  } finally {
+    one.close();
   }
 });
 
