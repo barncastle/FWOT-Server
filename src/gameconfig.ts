@@ -307,6 +307,7 @@ export class GameConfigSet {
   private generation = 0;
   private watcher: FSWatcher | null = null;
   private state: BuiltState | null = null;
+  private previousFiles: Map<string, Buffer> | null = null;
   private builtKey: string | null = null;
 
   constructor(root: string, options: GameConfigOptions) {
@@ -339,6 +340,12 @@ export class GameConfigSet {
       throw new Error(`${EVENTS_FILE}: no "entries" array`);
     }
     this.overlay = entries as OverlayEntry[];
+    const incomplete = this.overlay.find((e) =>
+      !e.file || !e.section || !e.id || !e.gate ||
+      asObject(e.on) === null || asObject(e.off) === null);
+    if (incomplete) {
+      throw new Error(`${EVENTS_FILE}: incomplete entry ${JSON.stringify(incomplete).slice(0, 120)}`);
+    }
     this.gates = [...new Set(this.overlay.map((e) => e.gate))].sort();
     this.collectWindows();
     const missing = this.gates.filter((g) => !this.windows.has(g));
@@ -363,8 +370,10 @@ export class GameConfigSet {
     }
 
     this.patchesDir = join(root, PATCHES_DIR);
-    this.watchPatches(this.patchesDir);
+    // Only once the set is known to build: a watcher started before it would
+    // outlive a constructor that throws, with no handle left to close it.
     this.refresh(now);
+    this.watchPatches(this.patchesDir);
   }
 
   /** The reply, with the clock spliced in. Cheap unless the state changed. */
@@ -396,9 +405,14 @@ export class GameConfigSet {
       .map((e) => e.file).filter((f) => f.startsWith("ContentPack-"));
   }
 
-  /** The bytes behind `<Name>-<md5>` or the bare `<Name>`, for GET /config/. */
+  /**
+   * The bytes behind `<Name>-<md5>` or the bare `<Name>`, for GET /config/. The
+   * generation before the current one still resolves: a client that took the
+   * manifest just before a gate flipped would otherwise get a 404 for a name it
+   * was just handed, which aborts its boot with ENGINE_DATA_ERROR.
+   */
   servedBytes(name: string): Buffer | undefined {
-    return this.state?.files.get(name);
+    return this.state?.files.get(name) ?? this.previousFiles?.get(name);
   }
 
   manifest(): ManifestEntry[] {
@@ -495,7 +509,12 @@ export class GameConfigSet {
     }
   }
 
-  /** The promo windows, over the rows AS SERVED. A row with no end never ends. */
+  /**
+   * The promo windows, over the season-shifted rows. A row with no end never ends.
+   * Derived once: a gate decides which config is built, so it cannot be read
+   * back out of one. A patch that edits a TimedPromo window therefore changes
+   * what the client is told about the promo without moving the gate.
+   */
   private collectWindows(): void {
     for (const file of this.base.values()) {
       if (!file.text.includes('"TimedPromo"')) continue;
@@ -541,8 +560,10 @@ export class GameConfigSet {
     const key = `${[...open].sort().join(",")}|${this.generation}`;
     if (key === this.builtKey) return;
     const first = this.builtKey === null;
-    this.builtKey = key;
+    // After the build: a throw must not leave the key claiming a state that was
+    // never built, which would serve the previous one forever.
     this.build(key, open);
+    this.builtKey = key;
     const closed = this.gates.filter((g) => !open.has(g));
     const rowsOff = this.overlay.filter((e) => !open.has(e.gate)).length;
     const names = [...open].sort();
@@ -597,6 +618,7 @@ export class GameConfigSet {
 
     // The merge order is the key order of adHocConfigs, and `success` is last,
     // where a batch layer that appends it would leave it.
+    this.previousFiles = this.state?.files ?? null;
     this.state = {
       key,
       manifest,
@@ -634,7 +656,13 @@ export class GameConfigSet {
       const wanted = open.has(entry.gate) ? entry.on : entry.off;
       const doc = asObject(docOf(entry.file));
       if (!doc) throw new Error(`event states: ${entry.file} is not in the config set`);
-      const section = asObject(doc[entry.section]) ?? {};
+      // A list-shaped section would be replaced wholesale by the single row
+      // below, losing every other row in it.
+      const section = doc[entry.section] === undefined
+        ? {} : asObject(doc[entry.section]);
+      if (!section) {
+        throw new Error(`event states: ${entry.file}/${entry.section} is not a dict section`);
+      }
       if (canon(section[entry.id]) === canon(wanted)) continue;
       working.set(entry.file, {
         ...doc,
@@ -704,6 +732,16 @@ function bySection(fields: ScaledField[]): Map<string, ScaledField[]> {
 
 /** One patch op, returning a new document. Throws if it addresses nothing. */
 function applyPatchOp(doc: unknown, op: PatchOp): unknown {
+  const where = `${op.file}/${op.section}/${op.id}`;
+  // Without this an op named "replace" would fall through to `set`, and a `set`
+  // with no value would write undefined -- which JSON.stringify drops from an
+  // object and turns into a null row in an array.
+  if (op.op !== "set" && op.op !== "merge" && op.op !== "delete") {
+    throw new Error(`unknown op ${JSON.stringify(op.op)} at ${where}`);
+  }
+  if (op.op !== "delete" && asObject(op.value) === null) {
+    throw new Error(`${op.op} ${where} needs an object value`);
+  }
   const root = asObject(doc);
   if (!root) throw new Error(`unknown file ${op.file}`);
   const section = root[op.section];
@@ -711,9 +749,7 @@ function applyPatchOp(doc: unknown, op: PatchOp): unknown {
 
   if (Array.isArray(section)) {
     const index = section.findIndex((r) => asObject(r)?.["id"] === op.id);
-    if (index < 0 && op.op !== "set") {
-      throw new Error(`unknown id ${op.file}/${op.section}/${op.id}`);
-    }
+    if (index < 0 && op.op !== "set") throw new Error(`unknown id ${where}`);
     let rows: unknown[];
     if (op.op === "delete") rows = section.filter((_, i) => i !== index);
     else if (op.op === "merge") {
@@ -728,9 +764,7 @@ function applyPatchOp(doc: unknown, op: PatchOp): unknown {
 
   const dict = asObject(section);
   if (!dict) throw new Error(`${op.file}/${op.section} is not a section`);
-  if (op.op !== "set" && !(op.id in dict)) {
-    throw new Error(`unknown id ${op.file}/${op.section}/${op.id}`);
-  }
+  if (op.op !== "set" && !(op.id in dict)) throw new Error(`unknown id ${where}`);
   const rows = { ...dict };
   if (op.op === "delete") delete rows[op.id];
   else if (op.op === "merge") rows[op.id] = { ...asObject(dict[op.id]), ...asObject(op.value) };

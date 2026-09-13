@@ -97,7 +97,9 @@ export function parseConfig(text: string): ServerConfig {
   return {
     host: str(root, "host", "config"),
     port,
-    publicUrl: str(root, "publicUrl", "config"),
+    // content-url and ConfigURL append their own path, so a trailing slash
+    // here would send the client to //static/.
+    publicUrl: str(root, "publicUrl", "config").replace(/\/+$/, ""),
     tls,
     cdn: { servers: servers as string[], cache: bool(cdn, "cache", "config.cdn") },
     logging: { verbose: bool(logging, "verbose", "config.logging") },

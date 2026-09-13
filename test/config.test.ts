@@ -19,6 +19,12 @@ test("config.example.json loads", () => {
   assert.equal(c.cdn.cache, true);
 });
 
+test("a trailing slash on publicUrl is dropped", () => {
+  // content-url and ConfigURL append their own path.
+  const c = parseConfig(mutate((c) => { c["publicUrl"] = "http://host:8090//"; }));
+  assert.equal(c.publicUrl, "http://host:8090");
+});
+
 test("tls accepts a cert and key pair", () => {
   const c = parseConfig(mutate((c) => { c["tls"] = { cert: "a.pem", key: "b.pem" }; }));
   assert.deepEqual(c.tls, { cert: "a.pem", key: "b.pem" });

@@ -134,6 +134,8 @@ test("GET /config serves the manifest's bytes with their etag", async () => {
     assert.equal(res.headers.get("content-encoding"), null);
     assert.deepEqual(Buffer.from(await res.arrayBuffer()), body);
     assert.equal((await fetch(`${at}/config/Nothing`)).status, 404);
+    // A malformed escape names no file; it must not throw a 500.
+    assert.equal((await fetch(`${at}/config/%zz`)).status, 404);
   } finally {
     one.close();
   }

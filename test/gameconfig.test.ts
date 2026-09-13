@@ -386,6 +386,73 @@ test("a patch sets, merges and deletes; a bad one is rejected whole", () => {
   }
 });
 
+test("a patch with an unknown op or no value is rejected whole", () => {
+  const root = fixture();
+  const set = build({}, root);
+  const patch = (body: unknown) =>
+    writeFileSync(join(root, "patches", "10-test.json"), JSON.stringify(body));
+  const numbers = () => {
+    const one = build({}, root);
+    try {
+      return (one.servedDoc("Town") as any)["Numbers"]["n1"];
+    } finally {
+      one.close();
+    }
+  };
+  try {
+    // An op that is not set/merge/delete must not fall through to `set`.
+    patch([{ file: "Town", section: "Numbers", id: "n1", op: "replace", value: { d: 9 } }]);
+    assert.equal(numbers()["d"], 7);
+    // A `set` with no value would write undefined, which serializes to nothing.
+    patch([{ file: "Town", section: "Numbers", id: "n1", op: "set" }]);
+    assert.equal(numbers()["d"], 7);
+    // The same on a list section, where undefined becomes a null row.
+    patch([{ file: "Town", section: "Rows", id: "r1", op: "set" }]);
+    const one = build({}, root);
+    assert.deepEqual((one.servedDoc("Town") as any)["Rows"],
+      [{ id: "r1", keep: true }, { id: "r2", keep: false }]);
+    one.close();
+  } finally {
+    set.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an overlay on a list section is refused, not flattened", () => {
+  const root = fixture();
+  try {
+    const overlay = JSON.parse(readFileSync(join(root, "data", "events.json"), "utf8"));
+    overlay.entries[0].section = "Rows";
+    writeFileSync(join(root, "data", "events.json"), JSON.stringify(overlay));
+    assert.throws(() => build({}, root), /Town\/Rows is not a dict section/);
+
+    overlay.entries[0] = { ...overlay.entries[0], section: "Character", off: undefined };
+    writeFileSync(join(root, "data", "events.json"), JSON.stringify(overlay));
+    assert.throws(() => build({}, root), /incomplete entry/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a name from the previous generation still resolves", () => {
+  const root = fixture();
+  const set = build({}, root);
+  try {
+    const open = [...set.windows.get("t_promo")!][0]!;
+    set.replyJson(open.start + 60);
+    const onName = set.manifest().find((e) => e.file.startsWith("Town-"))!.file;
+    set.replyJson(open.end + 60);
+    const offName = set.manifest().find((e) => e.file.startsWith("Town-"))!.file;
+    assert.notEqual(onName, offName, "the gate flip changed the file");
+    // The client may still be fetching what the last reply named.
+    assert.ok(set.servedBytes(onName), "the previous generation still resolves");
+    assert.ok(set.servedBytes(offName));
+  } finally {
+    set.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("writing a patch bumps the generation and rebuilds", async () => {
   const root = fixture();
   const set = build({}, root);

@@ -95,7 +95,12 @@ export function createApp(deps: AppDeps): Hono {
   // The client validates the ETag against the bytes it receives, so these are
   // never gzipped.
   app.get("/config/*", (c) => {
-    const name = decodeURIComponent(c.req.path.slice("/config/".length));
+    let name: string;
+    try {
+      name = decodeURIComponent(c.req.path.slice("/config/".length));
+    } catch {
+      return c.text("not found", 404); // a malformed escape names no file
+    }
     const data = deps.gameConfig?.servedBytes(name);
     if (!data) return c.text("not found", 404);
     // Node types Buffer over ArrayBufferLike; Hono's body wants ArrayBuffer.
