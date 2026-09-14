@@ -1,8 +1,8 @@
 /**
- * The season calendar: when each promo runs, and which row each event
- * character gets while it does.
+ * The season-align shift of every TimedPromo row, and the event states that
+ * follow the shifted promo windows.
  *
- * These are the two passes that make the served set GENUINE, which is what
+ * These two passes are what make the served set GENUINE, which is what
  * separates them from `patches`: their rows come from named dump revisions,
  * they are not a host choice, and a fault in them is fatal rather than skipped.
  */

@@ -3,10 +3,6 @@
  * each. A factor of 1.0 skips its pass entirely, which keeps the served bytes
  * identical to a genuine build -- scaling is a HOST CHOICE, and the rule is that
  * the default is genuine and anything else is logged as not.
- *
- * Every entry below was checked against the season set before it was added. The
- * rejection notes are part of the table: they say what was considered and why
- * it is not here.
  */
 import { asObject, numberOf, rawNumber, type Row } from "./json.js";
 
