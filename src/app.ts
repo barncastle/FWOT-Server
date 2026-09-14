@@ -95,7 +95,7 @@ export function createApp(deps: AppDeps): Hono {
       );
     }
 
-    return respond(c, entries);
+    return respond(c, entries, deps.verbose);
   });
 
   // The client validates the ETag against the bytes it receives, so these are
@@ -145,7 +145,9 @@ export function createApp(deps: AppDeps): Hono {
  * client asked for it -- its HTTP stack adds Accept-Encoding itself and
  * inflates transparently. The GET routes are never gzipped.
  */
-async function respond(c: Context, entries: unknown[]): Promise<Response> {
+async function respond(
+  c: Context, entries: unknown[], verbose: boolean,
+): Promise<Response> {
   const body = `{"response":[${entries
     .map((e) => (e instanceof RawJson ? e.json : JSON.stringify(e))).join(",")}]}`;
   const plain = Buffer.from(body, "utf8");
@@ -156,7 +158,11 @@ async function respond(c: Context, entries: unknown[]): Promise<Response> {
   if (/\bgzip\b/i.test(c.req.header("Accept-Encoding") ?? "")) {
     const packed = await gzip(plain, { level: 6 });
     headers["Content-Encoding"] = "gzip";
+    if (verbose) {
+      console.log(`  reply ${plain.length} bytes -> gzip ${packed.length} on the wire`);
+    }
     return c.body(packed, 200, headers);
   }
+  if (verbose) console.log(`  reply ${plain.length} bytes plain (no gzip asked)`);
   return c.body(plain, 200, headers);
 }
