@@ -88,6 +88,15 @@ export function parseConfig(text: string): ServerConfig {
   if (!Array.isArray(servers) || servers.some((s) => typeof s !== "string")) {
     throw new ConfigError("config.cdn.servers: expected an array of strings");
   }
+  // A scheme-less entry makes fetch throw on every asset, which cdn.ts cannot
+  // tell apart from the 403 it expects, so the server would serve nothing from
+  // that upstream for the life of the run and say nothing about it.
+  for (const server of servers as string[]) {
+    if (!/^https?:\/\/[^/]/.test(server)) {
+      throw new ConfigError(
+        `config.cdn.servers: "${server}" is not an absolute http(s) URL`);
+    }
+  }
 
   const logging = obj(root["logging"], "config.logging");
   exact(logging, ["verbose"], "config.logging");

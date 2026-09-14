@@ -41,6 +41,8 @@ const BAD: [string, string][] = [
   ["a non-integer port", mutate((c) => { c["port"] = 80.5; })],
   ["a non-string host", mutate((c) => { c["host"] = 0; })],
   ["cdn.servers holding a non-string", mutate((c) => { c["cdn"]["servers"] = [1]; })],
+  ["a scheme-less cdn server", mutate((c) => { c["cdn"]["servers"] = ["cdn.example"]; })],
+  ["a cdn server with no host", mutate((c) => { c["cdn"]["servers"] = ["https:///a"]; })],
   ["a half-specified tls block", mutate((c) => { c["tls"] = { cert: "a.pem" }; })],
   ["malformed JSON", "{"],
 ];

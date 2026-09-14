@@ -6,7 +6,7 @@
  * Nothing is mirrored here and a miss is never recorded: a name that 403s on
  * a bucket today may be a 200 tomorrow, and the client re-asks anyway.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { writeAtomic } from "./store.js";
 
@@ -100,9 +100,9 @@ export class Cdn {
     return hit;
   }
 
-  private resolve(name: string, userAgent: string): Promise<CdnHit | null> {
-    const cached = this.cache ? this.read(this.cacheDir, name) : null;
-    if (cached) return Promise.resolve({ data: cached, source: "cache" });
+  private async resolve(name: string, userAgent: string): Promise<CdnHit | null> {
+    const cached = this.cache ? await this.read(this.cacheDir, name) : null;
+    if (cached) return { data: cached, source: "cache" };
 
     // One fetch per name. A cold boot pulls thousands of assets over several
     // connections at once, and asking the upstream twice for the same file
@@ -122,15 +122,19 @@ export class Cdn {
       if (this.cache) this.store(name, data);
       return { data, source: `upstream ${index}` };
     }
-    const local = this.read(this.localDir, name);
+    const local = await this.read(this.localDir, name);
     return local ? { data: local, source: "local" } : null;
   }
 
   private async upstream(
     base: string, name: string, userAgent: string,
   ): Promise<Buffer | null> {
+    // `#` and `?` in a name would be read as a fragment or a query and
+    // truncate it, fetching a different asset than the cache and the local
+    // directory look up under that same name.
+    const path = name.replace(/[#?]/g, (ch) => encodeURIComponent(ch));
     try {
-      const res = await fetch(`${base.replace(/\/+$/, "")}/${name}`, {
+      const res = await fetch(`${base.replace(/\/+$/, "")}/${path}`, {
         headers: userAgent ? { "User-Agent": userAgent } : {},
         signal: AbortSignal.timeout(this.timeoutMs),
       });
@@ -143,6 +147,7 @@ export class Cdn {
     }
   }
 
+  /** Sync: writeAtomic is shared with the shutdown flush, which cannot await. */
   private store(name: string, data: Buffer): void {
     const path = under(this.cacheDir, name);
     if (!path) return;
@@ -155,13 +160,14 @@ export class Cdn {
     }
   }
 
-  private read(dir: string, name: string): Buffer | null {
+  /** Async so that one 30 MB asset does not stall every other request. */
+  private async read(dir: string, name: string): Promise<Buffer | null> {
     const path = under(dir, name);
-    if (!path || !existsSync(path)) return null;
+    if (!path) return null;
     try {
-      return readFileSync(path);
+      return await readFile(path);
     } catch {
-      return null;             // a directory, or an unreadable file: a miss
+      return null;             // absent, a directory, or unreadable: a miss
     }
   }
 }

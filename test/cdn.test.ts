@@ -192,6 +192,23 @@ test(".compressed maps to the platform's real name", async () => {
   }
 });
 
+test("a name holding # or ? reaches the upstream whole", async () => {
+  // Interpolated raw, they would become a fragment or a query and fetch a
+  // different asset than the cache and the local directory look up.
+  const up = await upstream({ "a#b.ccz": PAYLOAD, "c?d.ccz": PAYLOAD });
+  const r = rig({ servers: [up.url], cache: true }, up);
+  try {
+    assert.deepEqual(await bytes(await r.get("a%23b.ccz")), PAYLOAD);
+    assert.equal(up.hits.get("a#b.ccz"), 1);
+    assert.deepEqual(r.cached("a#b.ccz"), PAYLOAD);
+
+    assert.deepEqual(await bytes(await r.get("c%3Fd.ccz")), PAYLOAD);
+    assert.equal(up.hits.get("c?d.ccz"), 1);
+  } finally {
+    r.close();
+  }
+});
+
 test("a traversing name is refused without touching the disk or an upstream", async () => {
   const up = await upstream({});
   const r = rig({ servers: [up.url], cache: true }, up);
