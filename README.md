@@ -53,10 +53,37 @@ Use plain HTTP. Set `publicUrl` to `http://<lan-ip>:<port>` and point the
 patched client at the same host and scheme.
 
 TLS is only worth it on an internet host with a **publicly trusted**
-certificate: the client verifies certificates against the system store and
-ignores user-installed CAs, so a self-signed or private-CA cert fails the
-handshake. On the internet, either give the server a real certificate or put a
-TLS-terminating reverse proxy in front of it.
+certificate: the client verifies certificates against the system store, does no
+pinning, and ignores user-installed CAs, so a self-signed or private-CA cert
+fails the handshake. A self-signed certificate is therefore good for a local
+test of this server and nothing else. On the internet, either give the server a
+certificate for the hostname patched into the APK -- Let's Encrypt is trusted
+from Android 7.1.1 -- or put a TLS-terminating reverse proxy in front of it.
+
+With `tls` set the process serves HTTPS and only HTTPS: there is no redirect
+listener and no second port. `publicUrl` must use the same scheme, because it
+feeds `content-url`; an `http://` publicUrl under TLS is warned about at
+startup. The reverse -- no `tls` with an `https://` publicUrl -- is the
+reverse-proxy setup and is not warned about.
+
+## Limits
+
+`POST /tapservice/api/` is capped and rate limited. Asset and config GETs are
+neither: a first launch pulls thousands of files.
+
+| Limit | Value | Over it |
+| --- | --- | --- |
+| Request body | 1 MiB (a real save is ~2 KB) | 413 |
+| Requests per IP | 120/min, burst 20 | 429 with `Retry-After: 1` |
+
+Both are hardcoded and both log when they fire. The numbers are loose on
+purpose: a cold boot is a handful of POSTs and then a save every 60 s, so a
+player never approaches them.
+
+Behind a reverse proxy every request arrives from the proxy's address, so all
+players share one bucket and a busy server will hit the limit. `X-Forwarded-For`
+is deliberately not read -- it is spoofable by anyone who can reach the server
+directly. Rate limit at the proxy instead.
 
 ## Config set
 
@@ -102,5 +129,6 @@ at the real CDN.
 
 ## Status
 
-Done: transport, actions, storage, the config pipeline and the asset CDN.
-Rate limiting and TLS are not built yet.
+Done: transport, actions, storage, the config pipeline, the asset CDN, the
+request limits and TLS. `tools/install.py` does not exist yet, so the game
+data has to be put in `data/` by hand.

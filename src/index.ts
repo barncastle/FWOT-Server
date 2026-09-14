@@ -2,8 +2,10 @@
  * Entry point: read and validate config.json, build the app, listen, and
  * flush the store on shutdown.
  */
-import { serve } from "@hono/node-server";
+import { serve, type ServerType } from "@hono/node-server";
+import type { Hono } from "hono";
 import { readFileSync, realpathSync } from "node:fs";
+import { createServer as createHttpsServer } from "node:https";
 import { fileURLToPath } from "node:url";
 import { createApp } from "./app.js";
 import { Cdn } from "./cdn.js";
@@ -121,6 +123,54 @@ export function parseConfig(text: string): ServerConfig {
   };
 }
 
+function readTls(path: string, key: "cert" | "key"): Buffer {
+  try {
+    return readFileSync(path);
+  } catch (err) {
+    console.error(`config.tls.${key}: cannot read ${path}: ${(err as Error).message}`);
+    process.exit(1);
+  }
+}
+
+/**
+ * One scheme per process: plain HTTP, or HTTPS when config.tls names a cert
+ * and key. There is no redirect listener. Node's defaults (TLS 1.2+,
+ * ECDHE-GCM) suit the client's HTTP stack, so no ciphers are pinned.
+ */
+export function listen(config: ServerConfig, app: Hono, ready: () => void): ServerType {
+  // publicUrl feeds content-url, so an http:// one under TLS sends every asset
+  // GET to a port that is not listening. The reverse -- no TLS with an https://
+  // publicUrl -- is the legitimate reverse-proxy setup and is not warned about.
+  if (config.tls && config.publicUrl.startsWith("http://")) {
+    console.warn(`publicUrl ${config.publicUrl} is http:// but TLS is on: ` +
+      `the client's asset GETs will not reach this server`);
+  }
+  const tls = config.tls
+    ? {
+      createServer: createHttpsServer,
+      serverOptions: {
+        cert: readTls(config.tls.cert, "cert"),
+        key: readTls(config.tls.key, "key"),
+      },
+    }
+    : {};
+  const scheme = config.tls ? "https" : "http";
+  try {
+    return serve(
+      { fetch: app.fetch, hostname: config.host, port: config.port, ...tls },
+      (info) => {
+        console.log(`tapservice listening on ${scheme}://${config.host}:${info.port}`);
+        ready();
+      },
+    );
+  } catch (err) {
+    // createServer builds the secure context here and throws on a malformed
+    // PEM or a swapped cert and key -- an OpenSSL stack trace otherwise.
+    console.error(`config.tls: ${(err as Error).message}`);
+    process.exit(1);
+  }
+}
+
 function main(): void {
   let config: ServerConfig;
   try {
@@ -150,19 +200,15 @@ function main(): void {
 
   // The startup lines belong in the listening callback: printed before it,
   // they announce a server that a failed bind is about to take down.
-  const server = serve(
-    { fetch: app.fetch, hostname: config.host, port: config.port },
-    (info) => {
-      console.log(`tapservice listening on http://${config.host}:${info.port}`);
-      console.log(`  publicUrl ${config.publicUrl}`);
-      console.log(`  users     ${store.users.size} known`);
-      console.log(`  configs   ${gameConfig?.manifest().length ?? 0} served`);
-      console.log(`  cdn       ${config.cdn.servers.length} upstream(s), ` +
-        `cache ${config.cdn.cache ? "on" : "off"}`);
-      console.log(`  scaling   buildTime=${config.scaling.buildTime} ` +
-        `reward=${config.scaling.reward} cost=${config.scaling.cost}`);
-    },
-  );
+  const server = listen(config, app, () => {
+    console.log(`  publicUrl ${config.publicUrl}`);
+    console.log(`  users     ${store.users.size} known`);
+    console.log(`  configs   ${gameConfig?.manifest().length ?? 0} served`);
+    console.log(`  cdn       ${config.cdn.servers.length} upstream(s), ` +
+      `cache ${config.cdn.cache ? "on" : "off"}`);
+    console.log(`  scaling   buildTime=${config.scaling.buildTime} ` +
+      `reward=${config.scaling.reward} cost=${config.scaling.cost}`);
+  });
 
   // Without this, a port already in use is an unhandled 'error' event: the
   // operator gets a Node stack trace instead of the one line that says what

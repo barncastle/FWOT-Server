@@ -8,6 +8,7 @@ import { gzip as gzipCb } from "node:zlib";
 import { handleAction, RawJson, type ActionContext, type GameConfig } from "./actions.js";
 import type { Cdn } from "./cdn.js";
 import { checksum, decodeRequest, etagFor } from "./codec.js";
+import { bodyCap, RateLimiter } from "./limits.js";
 import type { Store } from "./store.js";
 
 const gzip = promisify(gzipCb);
@@ -17,6 +18,8 @@ export interface AppDeps {
   gameConfig: GameConfig | null;
   cdn: Cdn;
   verbose: boolean;
+  /** Injectable clock for the rate limiter, so tests do not sleep. */
+  now?: () => number;
 }
 
 type Call = [string, unknown];
@@ -52,8 +55,9 @@ function shape(entry: unknown): string {
 
 export function createApp(deps: AppDeps): Hono {
   const app = new Hono();
+  const limiter = new RateLimiter(deps.now);
 
-  app.post("/tapservice/api/", async (c) => {
+  app.post("/tapservice/api/", limiter.middleware, bodyCap(), async (c) => {
     const started = Date.now();
     const body = await c.req.text();
     const { envelope, checksumOk } = decodeRequest(body);
