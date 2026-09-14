@@ -4,7 +4,7 @@
  * here is genuine, so the directory defaults to empty, any op that is active is
  * logged as such, and a bad file is skipped rather than being fatal.
  */
-import { readdirSync, readFileSync, watch, type FSWatcher } from "node:fs";
+import { readdirSync, readFileSync, watch as fsWatch, type FSWatcher } from "node:fs";
 import { join } from "node:path";
 import { asObject, parseDoc } from "./json.js";
 
@@ -82,7 +82,7 @@ export class PatchSet {
   watch(): void {
     let timer: NodeJS.Timeout | null = null;
     try {
-      this.watcher = watch(this.dir, () => {
+      this.watcher = fsWatch(this.dir, () => {
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => { this.version++; }, DEBOUNCE_MS);
         timer.unref();
