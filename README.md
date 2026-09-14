@@ -3,6 +3,16 @@
 A tapservice server for Futurama: Worlds of Tomorrow **1.5.7**. Node 22+, Hono,
 no other runtime dependencies.
 
+## Purpose
+
+An interoperability server. The game was officially terminated in 2023, when
+its API service was taken offline; the publisher's CDNs still serve its files.
+This server stands in for that API so the 1.5.7 client keeps working. You need
+your own copy of the client: this repository does not provide or distribute the
+client, a patched client, or any tool to patch it. The game's configuration is
+fetched from the publisher's CDN and decoded on your own machine by the
+installer, solely so this server can serve it back to that client.
+
 ## Disclaimer
 
 This is an independent, unofficial project. It is not affiliated with or
@@ -15,10 +25,58 @@ game assets and no game configuration files.
 ```sh
 npm install
 npm run build
+python tools/install.py     # Python 3.9+, stdlib only
 ```
 
-The game data is not in this repo. `tools/install.py` rebuilds it into `data/`
-from a hard-coded revision list (not wired up yet).
+## Game data
+
+No game data is in this repo. `tools/install.py` fetches it from the
+publisher's config CDN, which still serves every revision, and rebuilds
+`data/configs` (128 files) and `data/events.json`.
+
+Two integrity checks run on the way, and neither is skippable:
+
+- `tools/config_revisions.tsv` lists all 956 revision names with the md5 of the
+  **ciphertext** as served. A download that does not match it aborts the run, as
+  does a name that no longer returns 200 — a changed or missing revision would
+  change the build, so neither may pass quietly. Only network failures are
+  retried.
+- each name embeds the md5 of its **plaintext**, which the installer verifies
+  per file.
+
+The build itself is the recipe the project verified: `pick_configs.py` merges
+every revision of every config into one set, then the `SpaceChapter`,
+`displayEnemies` and `LocalDataRecovered` passes fill the three holes the dump
+never had. Every output is checked against
+`tools/season_manifest.txt` and **nothing is installed unless all 130 md5s
+match**, so a host ends up with the exact set this project tested or with an
+error naming the files that drifted.
+
+`data/saves/default_save.pb` is the exception, and the one piece of `data/`
+in this repo. It is the blob `getGameStatePB` hands a player with nothing
+saved. It is project-authored -- this project's own work, not TinyCo's -- so
+it is committed (451 bytes) where the server reads it, beside the per-player
+save directories.
+`install.py` only checks it against the manifest. The server re-reads it
+whenever it changes on disk, so a host can edit or replace it.
+
+| Flag | Effect |
+| --- | --- |
+| `--jobs N` | parallel downloads (default 8) |
+| `--offline` | build from what is already in `data/build/raw` |
+| `--verify-only` | re-check the installed `data/` against the manifest |
+| `--clean` | drop `data/build` first |
+
+`data/local-cdn` and `data/cdn-cache` are in the repo as empty directories
+with a `.gitkeep`, because empty is a valid state for both -- a miss, not an
+error. `install.py` makes them too, and makes `data/configs`, which is never
+legitimately empty.
+
+It downloads 176 MB and leaves about 420 MB under `data/`, most of it the
+intermediates in `data/build/`. That directory is kept so a re-run resumes: a
+raw file that still matches its etag is not downloaded again, and `--clean`
+drops it once the install is good. Test the installer itself with
+`python tools/test_install.py`.
 
 ## Configure
 
@@ -130,5 +188,10 @@ at the real CDN.
 ## Status
 
 Done: transport, actions, storage, the config pipeline, the asset CDN, the
-request limits and TLS. `tools/install.py` does not exist yet, so the game
-data has to be put in `data/` by hand.
+request limits, TLS and the data installer. Not yet done: a full boot of the
+1.5.7 client against this server, ban enforcement and save rollback tooling.
+
+## License
+
+[MIT](LICENSE). The licence covers this project's own work; it grants nothing
+over the game, its data or its trademarks.

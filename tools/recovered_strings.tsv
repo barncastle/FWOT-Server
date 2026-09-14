@@ -1,0 +1,31 @@
+# Localization strings read off genuine gameplay footage, because no config
+# revision that survives defines them. One row per string:
+#
+#   key<TAB>en_US<TAB>source
+#
+# Casing is as it appears on screen. None of these labels carry "all-caps" in
+# their layout except FUT_CHAPTER_LOCKED, so what you see is what is stored.
+FUT_MISSION_SELECT_ENEMIES	ENEMIES	gameplay screenshot A
+FUT_MISSION_SELECT_CREWSUGGEST	SUGGESTED CREW	gameplay screenshot A
+FUT_CHAPTER_AVAILABLE	Available	gameplay screenshot A
+FUT_CREWSELECT_MISSIONDIFF	Mission Difficulty:	gameplay screenshot B
+FUT_CREWSELECT_MISSION_EASY	EASY	gameplay screenshot B
+#
+# Chapter names. Genuine footage shows the chapter cell reading
+# "1. Omicron Persei 8 Story Missions" and "1. Mars Story Missions" -- the
+# leading number comes from FUT_SPACEMAP_NUMBERED_NAME, the rest is the
+# chapter's own name string. The planet names are our own LocalData; the
+# " Story Missions" suffix is what the two frames show.
+FUT_CHAPTER_NAME_1	Omicron Persei 8 Story Missions	gameplay screenshot A + gameplay video
+FUT_CHAPTER_NAME_2	Mars Story Missions	gameplay screenshot A + gameplay video
+FUT_CHAPTER_NAME_3	The Moon Story Missions	gameplay screenshot A + gameplay video
+FUT_CHAPTER_NAME_4	Chapek 9 Story Missions	gameplay screenshot A + gameplay video
+FUT_CHAPTER_NAME_5	Earth Story Missions	gameplay screenshot A + gameplay video
+FUT_CHAPTER_NAME_6	Amazonia Story Missions	gameplay screenshot A + gameplay video
+FUT_CHAPTER_NAME_7	Decapod 10 Story Missions	gameplay screenshot A + gameplay video
+FUT_CHAPTER_NAME_15	Osiris 4 Story Missions	gameplay screenshot A + gameplay video
+#
+# The Daily Planet's chapter name. NOT read off footage -- no frame we hold
+# shows it. The 1.5.x set splits planet 16 into one chapter per weekday
+# and only one is ever visible, so they share this key.
+FUT_CHAPTER_NAME_16	Daily Planet Missions	reconstructed -- no footage

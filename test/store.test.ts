@@ -88,8 +88,8 @@ test("the new-player template is re-read when the file changes", () => {
   const dir = root();
   const store = new Store(dir);
   assert.equal(store.newPlayerTemplate().length, 0);   // no file yet
-  mkdirSync(join(dir, "data"), { recursive: true });
-  const path = join(dir, "data", "new_player.pb");
+  mkdirSync(join(dir, "data", "saves"), { recursive: true });
+  const path = join(dir, "data", "saves", "default_save.pb");
   writeFileSync(path, Buffer.from("first"));
   assert.deepEqual(store.newPlayerTemplate(), Buffer.from("first"));
   writeFileSync(path, Buffer.from("second!"));

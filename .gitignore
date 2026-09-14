@@ -3,6 +3,16 @@ dist/
 config.json
 BRIEF.md
 MILESTONE*.md
-data/
+__pycache__/
 patches/*.json
 !patches/example.json
+
+# Runtime data: game configs, saves, caches. Two exceptions are tracked -- the
+# .gitkeep markers that pin directories the server expects, and the default
+# save, which is project-authored rather than TinyCo's. data/configs gets no
+# marker: it is created by tools/install.py, and an empty one would serve an
+# empty config set.
+data/**
+!data/**/
+!data/**/.gitkeep
+!data/saves/default_save.pb

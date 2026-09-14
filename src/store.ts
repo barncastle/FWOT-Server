@@ -14,7 +14,7 @@ import { md5 } from "./codec.js";
 
 const USERS_FILE = "data/users.json";
 const SAVES_DIR = "data/saves";
-const TEMPLATE_FILE = "data/new_player.pb";
+const TEMPLATE_FILE = "data/saves/default_save.pb";
 const SAVE_HISTORY = 10;          // newest N kept per user
 const SAVE_CAP = 1024 * 1024;     // 1 MiB inflated
 const WRITE_DEBOUNCE_MS = 1000;
