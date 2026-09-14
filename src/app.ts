@@ -6,6 +6,7 @@ import { Hono, type Context } from "hono";
 import { promisify } from "node:util";
 import { gzip as gzipCb } from "node:zlib";
 import { handleAction, RawJson, type ActionContext, type GameConfig } from "./actions.js";
+import type { Cdn } from "./cdn.js";
 import { checksum, decodeRequest, etagFor } from "./codec.js";
 import type { Store } from "./store.js";
 
@@ -14,6 +15,7 @@ const gzip = promisify(gzipCb);
 export interface AppDeps {
   store: Store;
   gameConfig: GameConfig | null;
+  cdn: Cdn;
   verbose: boolean;
 }
 
@@ -110,8 +112,24 @@ export function createApp(deps: AppDeps): Hono {
     });
   });
 
-  // Not served yet; the route exists so it is reserved.
-  app.get("/static/*", (c) => c.text("not found", 404));
+  // Assets are already compressed and the client checks the ETag against the
+  // bytes it received, so this route is never gzipped either. A Range header
+  // is ignored: nothing on this path asks for one, since the intro movie is a
+  // hardcoded URL that still points at the real CDN.
+  app.get("/static/*", async (c) => {
+    let rel: string;
+    try {
+      rel = decodeURIComponent(c.req.path.slice("/static/".length));
+    } catch {
+      return c.text("not found", 404); // a malformed escape names no file
+    }
+    const hit = await deps.cdn.get(rel, c.req.header("User-Agent") ?? "");
+    if (!hit) return c.text("not found", 404);
+    return c.body(hit.data as Uint8Array<ArrayBuffer>, 200, {
+      "Content-Type": "application/octet-stream",
+      "ETag": etagFor(hit.data),
+    });
+  });
 
   return app;
 }

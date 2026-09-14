@@ -47,7 +47,7 @@ function safeId(userId: string): string {
   return /^[A-Za-z0-9_-]{1,64}$/.test(userId) ? userId : md5(userId || "anonymous");
 }
 
-function writeAtomic(path: string, data: Buffer | string): void {
+export function writeAtomic(path: string, data: Buffer | string): void {
   mkdirSync(dirname(path), { recursive: true });
   const tmp = path + ".tmp";
   writeFileSync(tmp, data);

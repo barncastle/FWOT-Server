@@ -6,6 +6,7 @@ import { serve } from "@hono/node-server";
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createApp } from "./app.js";
+import { Cdn } from "./cdn.js";
 import { loadGameConfig, type GameConfigSet } from "./gameconfig.js";
 import { Store } from "./store.js";
 
@@ -131,7 +132,12 @@ function main(): void {
     console.error(`config set: ${(err as Error).message}`);
     process.exit(1);
   }
-  const app = createApp({ store, gameConfig, verbose: config.logging.verbose });
+  const cdn = new Cdn(".", {
+    servers: config.cdn.servers,
+    cache: config.cdn.cache,
+    verbose: config.logging.verbose,
+  });
+  const app = createApp({ store, gameConfig, cdn, verbose: config.logging.verbose });
 
   // The startup lines belong in the listening callback: printed before it,
   // they announce a server that a failed bind is about to take down.
@@ -142,6 +148,8 @@ function main(): void {
       console.log(`  publicUrl ${config.publicUrl}`);
       console.log(`  users     ${store.users.size} known`);
       console.log(`  configs   ${gameConfig?.manifest().length ?? 0} served`);
+      console.log(`  cdn       ${config.cdn.servers.length} upstream(s), ` +
+        `cache ${config.cdn.cache ? "on" : "off"}`);
       console.log(`  scaling   buildTime=${config.scaling.buildTime} ` +
         `reward=${config.scaling.reward} cost=${config.scaling.cost}`);
     },

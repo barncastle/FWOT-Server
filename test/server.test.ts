@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { gunzipSync } from "node:zlib";
 import { createApp } from "../src/app.js";
+import { Cdn } from "../src/cdn.js";
 import { checksum, encodeRequest, etagFor, percentEncode } from "../src/codec.js";
 import { Store } from "../src/store.js";
 
@@ -14,8 +15,10 @@ let server: ServerType;
 let base: string;
 
 before(async () => {
-  const store = new Store(mkdtempSync(join(tmpdir(), "fwot-srv-")));
-  const app = createApp({ store, gameConfig: null, verbose: false });
+  const root = mkdtempSync(join(tmpdir(), "fwot-srv-"));
+  const store = new Store(root);
+  const cdn = new Cdn(root, { servers: [], cache: false });
+  const app = createApp({ store, gameConfig: null, cdn, verbose: false });
   server = serve({ fetch: app.fetch, port: 0 });     // never 8080 or 8090
   await new Promise((r) => server.once("listening", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -112,8 +115,10 @@ test("the GET routes 404 with no config set, and are never gzipped", async () =>
 
 test("GET /config serves the manifest's bytes with their etag", async () => {
   const body = Buffer.from('{"Character":{}}', "utf8");
+  const root = mkdtempSync(join(tmpdir(), "fwot-cfg-"));
   const app = createApp({
-    store: new Store(mkdtempSync(join(tmpdir(), "fwot-cfg-"))),
+    store: new Store(root),
+    cdn: new Cdn(root, { servers: [], cache: false }),
     gameConfig: {
       replyJson: () => "{}",
       contentPackNames: () => [],

@@ -73,7 +73,34 @@ running on the device.
 The reply is about 21 MB, gzipped to about 2.3 MB per request. That is ~0.4 s of
 CPU on each cold boot, which only matters if many clients boot at once.
 
+## Assets
+
+`GET /static/*` serves what the client downloads from `content-url`. A name is
+resolved in order and the first hit wins:
+
+1. `data/cdn-cache`, when `cdn.cache` is on;
+2. each `cdn.servers` entry, in array order -- only a 200 counts, and an upstream
+   hit is written to the cache;
+3. `data/local-cdn`;
+4. 404.
+
+With `cdn.servers` empty only the local directory answers, so a mirrored copy of
+the assets in `data/local-cdn` is a complete offline setup. Nothing is mirrored
+by the server itself, and a miss is never cached: a name that 403s today may be
+served tomorrow.
+
+A `.compressed` name is logical, not a file. The client normally resolves it
+itself; as a safety net the server rewrites the suffix to `.astc.ccz` on Android
+or `.pvr.ccz` on iOS, chosen from the User-Agent and defaulting to Android.
+There is no transcoding and no density (`@2x`, `@4x`) is ever added.
+
+Assets go out uncompressed even when the request asks for gzip -- they are
+already compressed, and the client checks the ETag against the bytes it
+received. `Range` headers are ignored and the whole file is returned: nothing on
+this path needs them, since the intro movie is a hardcoded URL that still points
+at the real CDN.
+
 ## Status
 
-Done: transport, actions, storage and the config pipeline. The CDN routes,
-rate limiting and TLS are not built yet.
+Done: transport, actions, storage, the config pipeline and the asset CDN.
+Rate limiting and TLS are not built yet.
