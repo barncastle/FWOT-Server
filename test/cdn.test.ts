@@ -30,7 +30,14 @@ async function upstream(
 ): Promise<Upstream> {
   const hits = new Map<string, number>();
   const server = createServer((req, res) => {
-    const name = decodeURIComponent((req.url ?? "/").slice(1));
+    let name: string;
+    try {
+      name = decodeURIComponent((req.url ?? "/").slice(1));
+    } catch {
+      res.writeHead(400);                // what the real bucket answers
+      res.end();
+      return;
+    }
     hits.set(name, (hits.get(name) ?? 0) + 1);
     if (delayMs === Infinity) return;
     const entry = files[name];
@@ -192,10 +199,11 @@ test(".compressed maps to the platform's real name", async () => {
   }
 });
 
-test("a name holding # or ? reaches the upstream whole", async () => {
-  // Interpolated raw, they would become a fragment or a query and fetch a
-  // different asset than the cache and the local directory look up.
-  const up = await upstream({ "a#b.ccz": PAYLOAD, "c?d.ccz": PAYLOAD });
+test("a name holding #, ? or % reaches the upstream whole", async () => {
+  // Interpolated raw, # and ? would become a fragment or a query and fetch a
+  // different asset than the cache and the local directory look up, and a
+  // bare % is a malformed escape the bucket answers with 400.
+  const up = await upstream({ "a#b.ccz": PAYLOAD, "c?d.ccz": PAYLOAD, "50%Off.png": PAYLOAD });
   const r = rig({ servers: [up.url], cache: true }, up);
   try {
     assert.deepEqual(await bytes(await r.get("a%23b.ccz")), PAYLOAD);
@@ -204,6 +212,9 @@ test("a name holding # or ? reaches the upstream whole", async () => {
 
     assert.deepEqual(await bytes(await r.get("c%3Fd.ccz")), PAYLOAD);
     assert.equal(up.hits.get("c?d.ccz"), 1);
+
+    assert.deepEqual(await bytes(await r.get("50%25Off.png")), PAYLOAD);
+    assert.equal(up.hits.get("50%Off.png"), 1);
   } finally {
     r.close();
   }

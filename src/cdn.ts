@@ -129,10 +129,8 @@ export class Cdn {
   private async upstream(
     base: string, name: string, userAgent: string,
   ): Promise<Buffer | null> {
-    // `#` and `?` in a name would be read as a fragment or a query and
-    // truncate it, fetching a different asset than the cache and the local
-    // directory look up under that same name.
-    const path = name.replace(/[#?]/g, (ch) => encodeURIComponent(ch));
+    // URI encode special characters that are legal in a name but not in a URL
+    const path = name.replace(/[#?%]/g, (ch) => encodeURIComponent(ch));
     try {
       const res = await fetch(`${base.replace(/\/+$/, "")}/${path}`, {
         headers: userAgent ? { "User-Agent": userAgent } : {},
