@@ -37,6 +37,7 @@ CDN = "https://config-fut-tc.akamaized.net/"
 USER_AGENT = "fwot-server-installer/0.1"      # says what it is; the CDN serves it
 ATTEMPTS = 3
 TIMEOUT = 60
+RENAME_ATTEMPTS = 10                # about 22 s in all before giving up
 
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(TOOLS)
@@ -291,13 +292,32 @@ def verify(wanted, root, label):
                          "installed." % label)
 
 
+def rename(src, dst):
+    """os.rename, retried: on Windows a virus scanner or indexer can hold a tree
+    that was just written, and the rename is denied until it lets go."""
+    for attempt in range(RENAME_ATTEMPTS):
+        try:
+            os.rename(src, dst)
+            return
+        except PermissionError:
+            if attempt == RENAME_ATTEMPTS - 1:
+                raise
+            time.sleep(0.5 * (attempt + 1))
+
+
 def install_dir(staged, target):
     """Swap a prepared directory in, keeping the old one until it lands."""
     backup = target + ".old"
     shutil.rmtree(backup, ignore_errors=True)
-    if os.path.exists(target):
-        os.rename(target, backup)
-    os.rename(staged, target)
+    had_target = os.path.exists(target)
+    if had_target:
+        rename(target, backup)
+    try:
+        rename(staged, target)
+    except OSError:
+        if had_target:
+            rename(backup, target)      # never leave the server with no set
+        raise
     shutil.rmtree(backup, ignore_errors=True)
 
 

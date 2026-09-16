@@ -159,6 +159,41 @@ class InstallTest(unittest.TestCase):
 
         self.assertEqual(read(os.path.join(self.configs, "AppConfig")), b"old")
 
+    def lock_swap(self, times):
+        """Deny the staged -> configs rename `times` times, as a scanner would."""
+        real = os.rename
+        denied = []
+
+        def rename(src, dst):
+            if dst == self.configs and src.endswith("configs.new") and len(denied) < times:
+                denied.append(src)
+                raise PermissionError(5, "Access is denied", src)
+            real(src, dst)
+
+        for patch in (unittest.mock.patch.object(os, "rename", rename),
+                      unittest.mock.patch.object(install.time, "sleep")):
+            patch.start()
+            self.addCleanup(patch.stop)
+        return denied
+
+    def test_a_briefly_locked_swap_is_retried(self):
+        denied = self.lock_swap(times=1)
+
+        install.install()
+
+        self.assertEqual(len(denied), 1)
+        self.assertEqual(read(os.path.join(self.configs, "AppConfig")), b"new")
+        self.assertFalse(os.path.exists(self.configs + ".old"))
+
+    def test_a_swap_that_stays_locked_restores_the_old_set(self):
+        self.lock_swap(times=1000)
+
+        with self.assertRaises(PermissionError):
+            install.install()
+
+        self.assertEqual(read(os.path.join(self.configs, "AppConfig")), b"old")
+        self.assertFalse(os.path.exists(self.configs + ".old"))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
