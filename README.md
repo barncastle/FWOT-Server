@@ -174,7 +174,7 @@ resolved in order and the first hit wins:
 2. each `cdn.servers` entry, in array order -- only a 200 counts, and an upstream
    hit is written to the cache;
 3. `data/local-cdn`;
-4. 404.
+4. `404`.
 
 With `cdn.servers` empty only the local directory answers, so a mirrored copy of
 the assets in `data/local-cdn` is a complete offline setup. Nothing is mirrored
