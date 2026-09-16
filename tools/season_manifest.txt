@@ -132,5 +132,5 @@ cd576a4d2897d31f5bdb988da9bcb24f  configs/xmas_event
 37314b6f844d7f419385e2d9abe44690  configs/xmas_materials
 83e451cfbf8f31de936f845fa8843d97  configs/xmas_prizeCrafter
 b1ebf5cb8ae4fadde7757a4c1cbb361e  configs/xmas_spaceMap
-5b598319a7d6ba3db15c6aeaa3b407b5  events.json
+8706a024444c4e9a3543ae84dc562363  events.json
 7f15441b9df2a794b5070be81f2374e4  saves/default_save.pb

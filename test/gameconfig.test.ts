@@ -54,7 +54,7 @@ test("the season aligns to the calendar by a whole number of years", { skip: !HA
   const starts = [...set.windows.values()].flat().map((w) => w.start);
   assert.equal(Math.min(...starts), 1498644000 + 3287 * DAY);
   assert.equal([...set.windows.values()].flat().length, 68);
-  assert.equal(set.gates.length, 9);
+  assert.equal(set.gates.length, 10);
 
   // One shared offset: every row moved by it, and nothing else did.
   const disk = JSON.parse(readFileSync("data/configs/pod_event", "utf8"));

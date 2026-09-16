@@ -23,7 +23,7 @@ What goes in:
                       file would survive.
     their placeables  when OFF drops buildingId B, B's row with and without
                       characterId.
-    SPECIAL           three rows whose two sides differ by more than the bribe
+    SPECIAL           four rows whose two sides differ by more than the bribe
                       fields, listed explicitly below.
 
 Characters with no genuine OFF row are excluded and reported, never authored.
@@ -60,6 +60,18 @@ SPECIAL = {
         ("AMC_Event", "Character", "monique", "off", "AMC_Event-5003c14e"),
         ("AMC_Event", "RentBuilding", "amc_genericPyramid", "off",
          "AMC_Event-5003c14e")]},
+    # Both sides keep a briberyId, so the rule finds no OFF row. OFF is not
+    # bribe-less here, it is repriced: event currency is unspendable once the
+    # event closes, so the shop extension that kept him on sale for a further
+    # day had to charge 3750 regular instead of 750 event. His own bribe gate
+    # is that extension, which opens with week 5, so the gate has to be named
+    # rather than resolved -- and with it named, so does the predicate.
+    "robotSanta": {"promo": "xmasEvent_Promo",
+                   "predicate": 'isInEvent("xmasEvent")', "rows": [
+        ("xmas_characters", "Character", "robotSanta", "on",
+         "xmas_characters-843ed8d2"),
+        ("xmas_materials", "Price", "robotSanta_price", "on",
+         "xmas_materials-2c331a50")]},
 }
 
 
@@ -281,7 +293,7 @@ def main():
                                  "characters": []})["characters"].append(cid)
 
     for cid, spec in SPECIAL.items():
-        promo, pred = spec["promo"], "SPECIAL"
+        promo, pred = spec["promo"], spec.get("predicate", "SPECIAL")
         if promo is None:
             bribe = next((rows(served[n], "Character")[cid].get("briberyId")
                           for n in defined.get(cid, ())), None)
