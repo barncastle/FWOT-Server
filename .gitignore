@@ -4,6 +4,7 @@ config.json
 BRIEF.md
 MILESTONE*.md
 __pycache__/
+*.apk
 patches/*.json
 !patches/example.json
 
