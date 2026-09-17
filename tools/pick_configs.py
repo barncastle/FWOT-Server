@@ -14,7 +14,8 @@ highest-ranked revision winning a collision. Extra entries nobody asks for are
 inert; a missing one is not.
 
 `restore_bribe_rows` then repairs the ten rows the merge ranks wrongly, each
-taken whole from a genuine revision.
+taken whole from a genuine revision. `repair_shipped_data` fixes rows every
+revision shipped broken.
 
 Usage:
     python pick_configs.py -o data/build/season
@@ -188,6 +189,22 @@ def restore_bribe_rows(docs, catalogue, obtainable=frozenset()):
     return swaps, orphans
 
 
+def repair_shipped_data(docs):
+    """Fix rows that every revision shipped broken."""
+    # Every other invasion side line's _01 goal depends on its _00.
+    goals = docs["invasion_goals"]["Goals"]
+    goals["Invasion_NDNDSide_4_01"] = dict(
+        goals["Invasion_NDNDSide_4_01"], dependencies=["Invasion_NDNDSide_4_00"])
+    # A short showBadge drops every badge; live footage badges the first two.
+    for name in ("MysteryBoxClient", "InvasionEvent"):
+        boxes = docs[name]["MysteryBox"]
+        for i, box in enumerate(boxes):
+            flags = box.get("showBadge") or []
+            missing = range(len(flags), len(box.get("previewIcon") or []))
+            if missing:
+                boxes[i] = dict(box, showBadge=flags + [n < 2 for n in missing])
+
+
 def merge(revisions, obtainable=frozenset()):
     """Union every revision of one config into a single document.
 
@@ -312,6 +329,8 @@ def main():
     if orphans:
         print("  district bribe goal(s) no revision's Character row "
               "references: %s" % ", ".join(sorted(orphans)))
+
+    repair_shipped_data(docs)
 
     for name, doc in docs.items():
         with io.open(os.path.join(args.out, name), "w",

@@ -2,8 +2,7 @@
 # match this exactly is not installed.
 #
 # events.json carries two provenance labels naming the directories it was
-# built from, so its md5 here is the one this repo's paths produce
-# (5b598319).
+# built from, so its md5 here is the one this repo's paths produce.
 d1480a50d719e4d8250777bf7d644d6a  configs/AMC_Event
 4714166b7b4479d9f408532b3c9f6fa9  configs/AnalyticEvents
 2714ee45e8eb5d7c8f1f4fbeb0b67fb4  configs/AnimationConfig
@@ -44,7 +43,7 @@ d608d359cf1e6b6b176c4319afc5493d  configs/Heads
 eee2e1f5055b10ddb75820b1e38c7303  configs/InAppPurchases
 7bca409bebbb247ca8c973e377fe12f9  configs/IncentVideo
 fa59b708ebb87730d57a6e887cc40c20  configs/InfluencerLevels
-e01cc941db7d5f815d92955a82a8dc65  configs/InvasionEvent
+49248123d5a552879bd1aa58ff223531  configs/InvasionEvent
 8316b48c1a6228ea85d9bbdee489f824  configs/Investigation
 78273f899e3c987f50a022ea65ab4667  configs/Jobs
 055dc6b4972ccfcc1243632cc7cd7545  configs/LMB_Event
@@ -56,7 +55,7 @@ e01cc941db7d5f815d92955a82a8dc65  configs/InvasionEvent
 9aca6a21958c9b92892aef686fd21ff5  configs/Localization
 155fde2436ce4547c9b73812b6bdda60  configs/LowMemoryDevice
 32fdbf6222b3f21ce7f03ad7ed039a93  configs/Materials
-13841e9ca56b5f863d69468712f39fa3  configs/MysteryBoxClient
+2d2f346279b584ec04074ef494c71d59  configs/MysteryBoxClient
 27b9e852fee7ec0af7698c1053a7ac91  configs/New_LocalData
 691759c14ab1f0d9f3381a2dfe044fbc  configs/Notifications
 e236f57f5a0a9af1a6db1e267b525ae3  configs/OutfitLevel
@@ -106,7 +105,7 @@ ff158789001f5ee363eef14377465621  configs/invasion_characterDialog
 853b72b99beadd11c005ee644089fc81  configs/invasion_combat
 c9206a7eeb9ca6fdceb361e13be52f0b  configs/invasion_event
 564945e4f601dcdda85b7f6ec21a9b46  configs/invasion_featuredModal
-f22fe878a8ddb553ea7c0ab6922aa8ed  configs/invasion_goals
+37d46fc861ea0c7d3641a68d09359a48  configs/invasion_goals
 07c8ed037805c592c915d0720a428ccc  configs/invasion_investigations
 475b5f7f1cb2de27a106fcb1ea46e578  configs/invasion_localData
 82d16ddaab71896e198e741aceaceb7d  configs/invasion_materials
