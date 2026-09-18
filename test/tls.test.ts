@@ -22,7 +22,7 @@ function config(over: Partial<ServerConfig> = {}): ServerConfig {
       tls: null,
       cdn: { servers: [], cache: false },
       logging: { verbose: false },
-      scaling: { buildTime: 1.0, reward: 1.0, cost: 1.0 },
+      scaling: { buildTime: 1.0, actionTime: 1.0, reward: 1.0, cost: 1.0 },
     })),
     ...over,
   };

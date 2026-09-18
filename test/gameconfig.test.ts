@@ -19,7 +19,7 @@ const DAY = 86400;
 function build(options: Partial<GameConfigOptions> = {}, root = ".") {
   const set = loadGameConfig(root, {
     publicUrl: PUBLIC_URL,
-    scaling: { buildTime: 1, reward: 1, cost: 1 },
+    scaling: { buildTime: 1, actionTime: 1, reward: 1, cost: 1 },
     now: NOW,
     log: () => {},
     ...options,
@@ -249,9 +249,9 @@ test("the reply matches the recorded reference reply", { skip: !HAVE_SET }, () =
 
 test("scaling moves the fields in the table and nothing else", { skip: !HAVE_SET }, () => {
   const plain = build();
-  const timed = build({ scaling: { buildTime: 2, reward: 1, cost: 1 } });
-  const costly = build({ scaling: { buildTime: 1, reward: 1, cost: 2 } });
-  const paid = build({ scaling: { buildTime: 1, reward: 2, cost: 1 } });
+  const timed = build({ scaling: { buildTime: 2, actionTime: 1, reward: 1, cost: 1 } });
+  const costly = build({ scaling: { buildTime: 1, actionTime: 1, reward: 1, cost: 2 } });
+  const paid = build({ scaling: { buildTime: 1, actionTime: 1, reward: 2, cost: 1 } });
 
   const rows = (set: ReturnType<typeof build>, file: string, section: string) =>
     (set.servedDoc(file) as Record<string, Record<string, Record<string, unknown>>>)[section]!;
@@ -271,6 +271,21 @@ test("scaling moves the fields in the table and nothing else", { skip: !HAVE_SET
     checked++;
   }
   assert.ok(checked > 100, `${checked} constructionTime rows checked`);
+
+  // Job waits move with actionTime, not buildTime.
+  const acted = build({ scaling: { buildTime: 1, actionTime: 2, reward: 1, cost: 1 } });
+  const solo = rows(plain, "CharacterActions", "SoloActions");
+  const slower = rows(acted, "CharacterActions", "SoloActions");
+  const unmoved = rows(timed, "CharacterActions", "SoloActions");
+  checked = 0;
+  for (const [id, row] of Object.entries(solo)) {
+    const wait = row["duration"];
+    if (typeof wait !== "number" || wait <= 0) continue;
+    assert.equal(slower[id]!["duration"], Math.max(1, Math.round(wait * 2)), id);
+    assert.equal(unmoved[id]!["duration"], wait, id);
+    checked++;
+  }
+  assert.ok(checked > 100, `${checked} SoloActions duration rows checked`);
 
   const prices = rows(plain, "Price", "Price");
   const doubled = rows(costly, "Price", "Price");
@@ -339,7 +354,7 @@ function fixture(): string {
 
 test("a rebuild preserves every number literal", () => {
   const root = fixture();
-  const set = build({ scaling: { buildTime: 1, reward: 1, cost: 2 } }, root);
+  const set = build({ scaling: { buildTime: 1, actionTime: 1, reward: 1, cost: 2 } }, root);
   try {
     const text = set.servedBytes("Town")!.toString("utf8");
     assert.match(text, /"a":3\.0/);
@@ -512,7 +527,7 @@ test("a missing overlay is fatal and an empty config dir serves nothing", () => 
     assert.throws(() => build({}, root), /events\.json is missing/);
     rmSync(join(root, "data", "configs", "Town"));
     assert.equal(loadGameConfig(root, {
-      publicUrl: PUBLIC_URL, scaling: { buildTime: 1, reward: 1, cost: 1 },
+      publicUrl: PUBLIC_URL, scaling: { buildTime: 1, actionTime: 1, reward: 1, cost: 1 },
     }), null);
   } finally {
     rmSync(root, { recursive: true, force: true });

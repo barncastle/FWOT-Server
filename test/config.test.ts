@@ -15,7 +15,7 @@ test("config.example.json loads", () => {
   const c = parseConfig(GOOD);
   assert.equal(c.port, 8090);
   assert.equal(c.tls, null);
-  assert.deepEqual(c.scaling, { buildTime: 1, reward: 1, cost: 1 });
+  assert.deepEqual(c.scaling, { buildTime: 1, actionTime: 1, reward: 1, cost: 1 });
   assert.equal(c.cdn.cache, true);
 });
 

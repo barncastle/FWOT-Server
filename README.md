@@ -90,7 +90,7 @@ cp config.example.json config.json
 | `cdn.servers` | upstreams tried in order before the local CDN |
 | `cdn.cache` | store upstream hits to `data/cdn-cache` |
 | `logging.verbose` | one log line per request |
-| `scaling` | plain multipliers for `buildTime`, `reward`, `cost`; `1.0` is genuine, `0.5` is half, `2.0` is double |
+| `scaling` | plain multipliers for `buildTime` (construction, skins, rent, land), `actionTime` (jobs and crafting), `reward`, `cost`; `1.0` is genuine, `0.5` is half, `2.0` is double |
 
 Unknown or missing keys are rejected at startup. Every scaling factor must be
 finite and greater than zero.

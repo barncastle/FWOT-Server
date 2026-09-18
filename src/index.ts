@@ -19,7 +19,7 @@ export interface ServerConfig {
   tls: { cert: string; key: string } | null;
   cdn: { servers: string[]; cache: boolean };
   logging: { verbose: boolean };
-  scaling: { buildTime: number; reward: number; cost: number };
+  scaling: { buildTime: number; actionTime: number; reward: number; cost: number };
 }
 
 class ConfigError extends Error {}
@@ -104,7 +104,7 @@ export function parseConfig(text: string): ServerConfig {
   exact(logging, ["verbose"], "config.logging");
 
   const scaling = obj(root["scaling"], "config.scaling");
-  exact(scaling, ["buildTime", "reward", "cost"], "config.scaling");
+  exact(scaling, ["buildTime", "actionTime", "reward", "cost"], "config.scaling");
 
   return {
     host: str(root, "host", "config"),
@@ -117,6 +117,7 @@ export function parseConfig(text: string): ServerConfig {
     logging: { verbose: bool(logging, "verbose", "config.logging") },
     scaling: {
       buildTime: factor(scaling, "buildTime"),
+      actionTime: factor(scaling, "actionTime"),
       reward: factor(scaling, "reward"),
       cost: factor(scaling, "cost"),
     },
@@ -207,6 +208,7 @@ function main(): void {
     console.log(`  cdn       ${config.cdn.servers.length} upstream(s), ` +
       `cache ${config.cdn.cache ? "on" : "off"}`);
     console.log(`  scaling   buildTime=${config.scaling.buildTime} ` +
+      `actionTime=${config.scaling.actionTime} ` +
       `reward=${config.scaling.reward} cost=${config.scaling.cost}`);
   });
 

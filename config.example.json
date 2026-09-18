@@ -5,5 +5,5 @@
   "tls": null,
   "cdn": { "servers": ["https://static-fut-tc.akamaized.net/"], "cache": true },
   "logging": { "verbose": false },
-  "scaling": { "buildTime": 1.0, "reward": 1.0, "cost": 1.0 }
+  "scaling": { "buildTime": 1.0, "actionTime": 1.0, "reward": 1.0, "cost": 1.0 }
 }

@@ -110,6 +110,7 @@ export class GameConfigSet {
     this.scaling = new Scaling(options.scaling);
     if (this.scaling.active) {
       this.log(`  scaling: buildTime=${options.scaling.buildTime} ` +
+        `actionTime=${options.scaling.actionTime} ` +
         `reward=${options.scaling.reward} cost=${options.scaling.cost} (non-genuine)`);
     }
 

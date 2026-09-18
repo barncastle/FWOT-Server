@@ -1,5 +1,5 @@
 /**
- * The three scaling factors: a plain multiplier over one explicit field table
+ * The four scaling factors: a plain multiplier over one explicit field table
  * each. A factor of 1.0 skips its pass entirely, which keeps the served bytes
  * identical to a genuine build -- scaling is a HOST CHOICE, and the rule is that
  * the default is genuine and anything else is logged as not.
@@ -20,15 +20,19 @@ interface ScaledField {
   readonly when?: (row: Row) => boolean;
 }
 
-/** Wait times, all whole seconds. */
+/** Waits on what the player builds, all whole seconds. */
 const BUILD_TIME_FIELDS: ScaledField[] = [
   { section: "RentBuilding", field: "constructionTime" }, // building construction wait
   { section: "Skins", field: "buildTime" },               // skin unlock wait
+  { section: "BuildingRent", field: "interval" },         // wait between rent collections
+  { section: "Blocks", field: "unlockingTime" },          // land clearing wait
+];
+
+/** Waits on what the characters do, all whole seconds. */
+const ACTION_TIME_FIELDS: ScaledField[] = [
   { section: "CraftingRecipe", field: "craftTime" },      // crafting wait
   { section: "SoloActions", field: "duration" },          // one-character job wait
   { section: "DualAction", field: "duration" },           // two-character job wait
-  { section: "BuildingRent", field: "interval" },         // wait between rent collections
-  { section: "Blocks", field: "unlockingTime" },          // land clearing wait
 ];
 
 // Rejected: Job has no duration (it is name/icon/colour metadata only), and
@@ -168,6 +172,7 @@ function bySection(fields: ScaledField[]): Map<string, ScaledField[]> {
 
 export interface ScalingFactors {
   buildTime: number;
+  actionTime: number;
   reward: number;
   cost: number;
 }
@@ -179,6 +184,7 @@ export class Scaling {
   constructor(factors: ScalingFactors) {
     for (const [fields, factor] of [
       [BUILD_TIME_FIELDS, factors.buildTime],
+      [ACTION_TIME_FIELDS, factors.actionTime],
       [REWARD_FIELDS, factors.reward],
       [COST_FIELDS, factors.cost],
     ] as [ScaledField[], number][]) {
